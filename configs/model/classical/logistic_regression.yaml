@@ -1,0 +1,4 @@
+name: classical/logistic_regression
+params:
+  max_iter: 200
+oversample: smote

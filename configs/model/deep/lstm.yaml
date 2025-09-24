@@ -1,0 +1,8 @@
+name: deep/lstm
+params:
+  epochs: 8
+  batch_size: 32
+  optimizer: rmsprop
+  learning_rate: 0.0005
+  dropout: 0.3
+  l2: 0.0001

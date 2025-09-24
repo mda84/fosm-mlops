@@ -1,0 +1,8 @@
+name: deep/conv1d
+params:
+  epochs: 5
+  batch_size: 32
+  optimizer: adam
+  learning_rate: 0.001
+  dropout: 0.3
+  l2: 0.0001

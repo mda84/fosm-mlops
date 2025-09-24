@@ -1,0 +1,4 @@
+features_path: data/processed/features.parquet
+labels_path: data/labels/synthetic_labels.csv
+model_path: models/latest/model.joblib
+reports_dir: reports

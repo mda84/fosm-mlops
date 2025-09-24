@@ -1,0 +1,6 @@
+raw:
+  path: data/raw/synthetic_signals.parquet
+  format: parquet
+labels:
+  path: data/labels/synthetic_labels.csv
+  format: csv

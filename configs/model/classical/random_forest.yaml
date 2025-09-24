@@ -1,0 +1,5 @@
+name: classical/random_forest
+params:
+  n_estimators: 200
+  max_depth: 10
+oversample: random
