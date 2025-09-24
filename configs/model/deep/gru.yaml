@@ -1,0 +1,8 @@
+name: deep/gru
+params:
+  epochs: 8
+  batch_size: 32
+  optimizer: adam
+  learning_rate: 0.0005
+  dropout: 0.25
+  l2: 0.0001

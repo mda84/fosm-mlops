@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fosm-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fosm-api
+  template:
+    metadata:
+      labels:
+        app: fosm-api
+    spec:
+      containers:
+        - name: api
+          image: fosm-mlops-api:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FOSM_MODEL_DIR
+              value: /models/latest
+          volumeMounts:
+            - name: model-volume
+              mountPath: /models
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+      volumes:
+        - name: model-volume
+          persistentVolumeClaim:
+            claimName: fosm-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fosm-api
+spec:
+  selector:
+    app: fosm-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

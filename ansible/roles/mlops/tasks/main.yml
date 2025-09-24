@@ -1,0 +1,32 @@
+---
+- name: Install prerequisites
+  apt:
+    name:
+      - docker.io
+      - docker-compose
+    state: present
+    update_cache: true
+
+- name: Ensure docker service is running
+  service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Create application directory
+  file:
+    path: /opt/fosm
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Copy compose file
+  copy:
+    src: ../../docker-compose.yml
+    dest: /opt/fosm/docker-compose.yml
+
+- name: Deploy stack
+  community.docker.docker_compose:
+    project_src: /opt/fosm
+    state: present

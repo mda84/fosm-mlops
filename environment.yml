@@ -1,0 +1,27 @@
+name: fosm-mlops
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - pyarrow
+  - scikit-learn
+  - imbalanced-learn
+  - xgboost
+  - lightgbm
+  - mlflow
+  - hydra-core
+  - pydantic
+  - fastapi
+  - uvicorn
+  - structlog
+  - great-expectations
+  - matplotlib
+  - seaborn
+  - plotly
+  - tensorflow
+  - pip:
+      - -e .[dev]

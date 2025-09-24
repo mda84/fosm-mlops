@@ -1,0 +1,5 @@
+window_size: 200
+step_size: 100
+sample_rate: 200
+scaler: standard
+output_dir: data/processed
