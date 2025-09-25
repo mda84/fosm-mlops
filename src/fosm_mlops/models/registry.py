@@ -6,6 +6,7 @@ from typing import Any
 
 from .anomaly import AnomalyModelConfig, BaseAnomalyModel
 from .classical import ClassicalModel, ClassicalModelConfig
+from .deep import Conv1DModel, DeepModelConfig
 
 
 def get_model(name: str, **kwargs: Any) -> Any:
@@ -26,10 +27,10 @@ def get_model(name: str, **kwargs: Any) -> Any:
         config = AnomalyModelConfig(name=name, **kwargs)
         return BaseAnomalyModel(config)
     if name.startswith("deep/"):
-        msg = (
-            "Deep learning models are not implemented in this lightweight runtime. "
-            "Please integrate a TensorFlow/PyTorch implementation and update the registry."
-        )
-        raise NotImplementedError(msg)
+        config = DeepModelConfig(name=name, **kwargs)
+        if name.endswith("conv1d"):
+            return Conv1DModel(config)
+        msg = f"Unsupported deep model: {name}"
+        raise ValueError(msg)
     msg = f"Unknown model type for name: {name}"
     raise ValueError(msg)
