@@ -51,13 +51,17 @@ def _infer_model_features(model: object) -> list[str]:
     # first match.
     if hasattr(model, "named_steps"):
         for step in model.named_steps.values():
+            if hasattr(step, "feature_columns"):
+                feature_cols = step.feature_columns  # type: ignore[attr-defined]
+                if isinstance(feature_cols, (list | tuple)):
+                    return [str(col) for col in feature_cols]
             if hasattr(step, "feature_names_in_"):
                 return [str(col) for col in step.feature_names_in_]
 
     # Some custom wrappers might expose a ``feature_columns`` attribute.
     if hasattr(model, "feature_columns"):
-        feature_cols = getattr(model, "feature_columns")
-        if isinstance(feature_cols, (list, tuple)):
+        feature_cols = model.feature_columns  # type: ignore[attr-defined]
+        if isinstance(feature_cols, (list | tuple)):
             return [str(col) for col in feature_cols]
 
     return []

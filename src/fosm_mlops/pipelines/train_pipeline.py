@@ -26,7 +26,6 @@ from ..features.build_features import (
 from ..ingest.batch import BatchLoader, BatchLoaderConfig
 from ..models import registry, utils
 
-
 logger = logging.getLogger(__name__)
 CONFIG_PATH = str((Path(__file__).resolve().parents[3] / "configs").resolve())
 
@@ -185,6 +184,33 @@ def _log_model_card(
     return card_path
 
 
+def _attach_feature_metadata(model: Any, feature_columns: list[str]) -> None:
+    """Attach feature metadata to the fitted model object.
+
+    Persisted estimators are deserialised directly during evaluation, so we
+    annotate both the high-level wrapper (when present) and the underlying
+    estimator/pipeline.  This allows downstream consumers to recover the
+    training-time feature ordering even if the JSON artifact is missing.
+    """
+
+    targets: list[Any] = []
+    if hasattr(model, "model"):
+        targets.append(model.model)  # type: ignore[attr-defined]
+    targets.append(model)
+
+    seen: set[int] = set()
+    for target in targets:
+        if id(target) in seen:
+            continue
+        seen.add(id(target))
+        try:
+            target.feature_columns = list(feature_columns)  # type: ignore[attr-defined]
+        except Exception:  # pragma: no cover - defensive best effort
+            logger.debug(
+                "Unable to attach feature metadata to model component %s", type(target)
+            )
+
+
 def _save_feature_columns(columns: list[str], artifact_dir: Path) -> Path:
     path = artifact_dir / "feature_columns.json"
     with path.open("w", encoding="utf-8") as f:
@@ -221,6 +247,7 @@ def main(cfg: DictConfig) -> None:
     ).columns.tolist()
     x_train = split.x_train[feature_columns].to_numpy()
     x_test = split.x_test[feature_columns].to_numpy()
+    _attach_feature_metadata(model, feature_columns)
     if cfg.model.name.startswith("deep/"):
         x_train = np.expand_dims(x_train, axis=-1)
         x_test = np.expand_dims(x_test, axis=-1)
