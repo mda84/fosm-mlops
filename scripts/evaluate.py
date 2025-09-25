@@ -39,8 +39,36 @@ def _load_feature_columns(cfg: dict) -> list[str]:
     return [str(col) for col in columns]
 
 
-def _prepare_feature_matrix(cfg: dict, features: pd.DataFrame) -> pd.DataFrame:
+def _infer_model_features(model: object) -> list[str]:
+    """Attempt to recover feature names from a fitted model pipeline."""
+
+    # Standard scikit-learn estimators expose ``feature_names_in_`` after fitting.
+    if hasattr(model, "feature_names_in_"):
+        return [str(col) for col in model.feature_names_in_]
+
+    # Pipelines may delegate this attribute to one of their steps (typically the
+    # first transformer or the estimator itself). Iterate in order to find the
+    # first match.
+    if hasattr(model, "named_steps"):
+        for step in model.named_steps.values():
+            if hasattr(step, "feature_names_in_"):
+                return [str(col) for col in step.feature_names_in_]
+
+    # Some custom wrappers might expose a ``feature_columns`` attribute.
+    if hasattr(model, "feature_columns"):
+        feature_cols = getattr(model, "feature_columns")
+        if isinstance(feature_cols, (list, tuple)):
+            return [str(col) for col in feature_cols]
+
+    return []
+
+
+def _prepare_feature_matrix(
+    cfg: dict, features: pd.DataFrame, model: object
+) -> pd.DataFrame:
     feature_columns = _load_feature_columns(cfg)
+    if not feature_columns:
+        feature_columns = _infer_model_features(model)
 
     df = features.drop(
         columns=["target", "event", "sensor_id", "start_time", "end_time"],
@@ -78,7 +106,7 @@ def main() -> None:
     merged["event"] = merged.apply(assign_event, axis=1)
     merged["target"] = (merged["event"] != "normal").astype(int)
 
-    feature_matrix = _prepare_feature_matrix(cfg, merged)
+    feature_matrix = _prepare_feature_matrix(cfg, merged, model)
     x = feature_matrix.to_numpy()
     y_true = merged["target"].to_numpy()
 
