@@ -65,7 +65,17 @@ class BaseAnomalyModel:
         msg = f"Unsupported anomaly model: {config.name}"
         raise ValueError(msg)
 
-    def fit(self, x: np.ndarray) -> None:
+    def fit(self, x: np.ndarray, y: np.ndarray | None = None) -> None:
+        """Fit the underlying anomaly detector.
+
+        The training pipeline always forwards feature matrices and label arrays
+        to ``fit`` for consistency with supervised estimators. Traditional
+        anomaly detectors ignore the labels, so we accept an optional ``y``
+        parameter and discard it to keep the interface uniform across model
+        types.
+        """
+
+        _ = y  # Labels are not used for unsupervised detectors.
         self.model.fit(x)
 
     def predict_scores(self, x: np.ndarray) -> np.ndarray:
