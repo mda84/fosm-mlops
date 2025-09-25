@@ -16,6 +16,49 @@ def load_config(path: Path) -> dict:
         return yaml.safe_load(f)
 
 
+def _load_feature_columns(cfg: dict) -> list[str]:
+    """Load the feature column ordering used during training if available."""
+
+    feature_path = cfg.get("feature_columns_path")
+    if feature_path is None:
+        feature_path = Path(cfg["model_path"]).with_name("feature_columns.json")
+    else:
+        feature_path = Path(feature_path)
+
+    if not feature_path.exists():
+        return []
+
+    with feature_path.open("r", encoding="utf-8") as f:
+        columns = json.load(f)
+
+    if not isinstance(columns, list):  # Defensive check against corrupt files
+        raise ValueError(
+            "feature_columns.json must contain a JSON array of column names"
+        )
+
+    return [str(col) for col in columns]
+
+
+def _prepare_feature_matrix(cfg: dict, features: pd.DataFrame) -> pd.DataFrame:
+    feature_columns = _load_feature_columns(cfg)
+
+    df = features.drop(
+        columns=["target", "event", "sensor_id", "start_time", "end_time"],
+        errors="ignore",
+    ).copy()
+
+    if feature_columns:
+        missing_cols = [col for col in feature_columns if col not in df.columns]
+        for column in missing_cols:
+            df[column] = 0.0
+        df = df.reindex(columns=feature_columns)
+    else:
+        # Fall back to deterministic ordering if no metadata is available
+        df = df[sorted(df.columns)]
+
+    return df
+
+
 def main() -> None:
     cfg = load_config(Path("configs/eval/default.yaml"))
     features = pd.read_parquet(cfg["features_path"])
@@ -34,7 +77,9 @@ def main() -> None:
     merged = features.copy()
     merged["event"] = merged.apply(assign_event, axis=1)
     merged["target"] = (merged["event"] != "normal").astype(int)
-    x = merged.drop(columns=["target", "event", "start_time", "end_time"], errors="ignore").to_numpy()
+
+    feature_matrix = _prepare_feature_matrix(cfg, merged)
+    x = feature_matrix.to_numpy()
     y_true = merged["target"].to_numpy()
 
     if hasattr(model, "predict_proba"):
