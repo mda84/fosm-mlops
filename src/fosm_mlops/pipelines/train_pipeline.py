@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import mlflow
 import numpy as np
 import pandas as pd
-from great_expectations.dataset import PandasDataset
 from hydra import main as hydra_main
 from omegaconf import DictConfig, OmegaConf
+
+try:  # pragma: no cover - optional dependency path varies by version
+    from great_expectations.dataset import PandasDataset
+except ImportError:  # pragma: no cover - fallback for GE >= 1.6
+    PandasDataset = None
 
 from ..features.build_features import (
     FeatureBuilder,
@@ -20,6 +25,10 @@ from ..features.build_features import (
 )
 from ..ingest.batch import BatchLoader, BatchLoaderConfig
 from ..models import registry, utils
+
+
+logger = logging.getLogger(__name__)
+CONFIG_PATH = str((Path(__file__).resolve().parents[3] / "configs").resolve())
 
 
 def _flatten_params(prefix: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -42,14 +51,71 @@ def _load_configured_dataframe(cfg_section: DictConfig) -> pd.DataFrame:
     return loader.load()
 
 
+def _fallback_expectation(
+    df: pd.DataFrame, expectation_type: str, kwargs: dict[str, Any]
+) -> None:
+    column = kwargs.get("column")
+    if column is None:
+        raise ValueError(
+            f"Expectation '{expectation_type}' requires a 'column' argument."
+        )
+    if expectation_type == "expect_column_values_to_not_be_null":
+        if df[column].isnull().any():
+            logger.warning(
+                "Expectation '%s' failed: column '%s' contains null values.",
+                expectation_type,
+                column,
+            )
+        return
+    if expectation_type == "expect_column_values_to_be_between":
+        series = df[column]
+        min_value = kwargs.get("min_value")
+        max_value = kwargs.get("max_value")
+        mask = pd.Series(True, index=series.index, dtype=bool)
+        if min_value is not None:
+            mask &= series >= min_value
+        if max_value is not None:
+            mask &= series <= max_value
+        if not mask.all():
+            logger.warning(
+                "Expectation '%s' failed: values in column '%s' outside [%s, %s]",
+                expectation_type,
+                column,
+                min_value,
+                max_value,
+            )
+        return
+    logger.warning(
+        "Unsupported expectation '%s'. Install great_expectations<1.6 or extend"
+        " the fallback handler.",
+        expectation_type,
+    )
+
+
 def _run_expectations(df: pd.DataFrame, expectation_cfg: DictConfig | None) -> None:
-    if expectation_cfg is None:
+    if expectation_cfg is None or not expectation_cfg.get("expectations"):
+        return
+    if PandasDataset is None:
+        logger.warning(
+            "great_expectations.dataset.PandasDataset is unavailable; applying"
+            " limited built-in validations."
+        )
+        for expectation in expectation_cfg.expectations:
+            expectation_type = expectation["type"]
+            kwargs = expectation.get("kwargs", {})
+            _fallback_expectation(df, expectation_type, kwargs)
         return
     dataset = PandasDataset(df)
     for expectation in expectation_cfg.expectations:
         expectation_type = expectation["type"]
         kwargs = expectation.get("kwargs", {})
-        getattr(dataset, expectation_type)(**kwargs)
+        result = getattr(dataset, expectation_type)(**kwargs)
+        if not result.success:
+            logger.warning(
+                "Expectation '%s' failed with kwargs %s.",
+                expectation_type,
+                kwargs,
+            )
 
 
 def _prepare_features(
@@ -126,10 +192,9 @@ def _save_feature_columns(columns: list[str], artifact_dir: Path) -> Path:
     return path
 
 
-@hydra_main(
-    config_path="../../../configs", config_name="train/default", version_base=None
-)
+@hydra_main(config_path=CONFIG_PATH, config_name="train/default", version_base=None)
 def main(cfg: DictConfig) -> None:
+    cfg = cfg.train
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(cfg.mlflow.experiment_name)
 

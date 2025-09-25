@@ -1,9 +1,9 @@
 # Default training configuration
 
 defaults:
-  - data: default
-  - model: classical/random_forest
-  - features: default
+  - /data@data: default
+  - /model@model: classical/random_forest
+  - /features@features: default
   - _self_
 
 mlflow:

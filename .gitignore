@@ -12,7 +12,7 @@ data/raw/
 data/processed/
 data/labels/
 reports/figures/
-models/
+/models/
 mlruns/
 notebooks/.ipynb_checkpoints/
 .eggs/
